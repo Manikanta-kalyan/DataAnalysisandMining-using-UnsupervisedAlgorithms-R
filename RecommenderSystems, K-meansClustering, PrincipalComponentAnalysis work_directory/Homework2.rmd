@@ -1,0 +1,296 @@
+---
+title: "Homework 2"
+author: "Rachael Hageman Blair"
+date: "`r Sys.Date()`"
+output:
+  pdf_document:
+    latex_engine: xelatex
+  word_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Loading Packages:
+```{r}
+library(ggplot2)
+library(datasets)
+library("cluster")
+library("multtest")
+library("fpc")
+library("bootcluster")
+library("fossil")
+```
+
+\newpage
+### Question 1:
+#### Consider the MovieLense data that is available in the recommenderlab package
+#### >data(MovieLense)
+#### >?MovieLense
+#### The data was collected through the MovieLens web site during a seven-month, and contains
+#### about 100,000 ratings (1-5) from 943 users on 1664 movies. See the help file on the data 
+#### To understand how to best manipulate the object. Design and evaluate a user-based recommender system. Create the system so that outputs a user’s top ten recommendations. Demo it on 3 users.
+
+Read in the Movie Lense data
+
+```{r}
+data(MovieLense)
+Ratings <- MovieLense
+head(Ratings) # 6 x 1664
+dim(Ratings) # 943 1664
+```
+
+Look at the first few ratings of the first user
+
+```{r}
+head(as(Ratings[1,], "list")[[1]])
+```
+Create a "realRatingMatrix (not required as MovieLense is already an object of realRatingMatrix but doesn't make a difference)
+
+```{r}
+R <- as(Ratings, "realRatingMatrix")
+```
+
+Get the Rating Matrix
+
+
+```{r}
+dim(getRatingMatrix(R))
+getRatingMatrix(R)[1:10, 1:10]
+```
+
+Create a recommender system
+
+```{r}
+recommenderRegistry$get_entries(dataType = "realRatingMatrix")
+
+recommender_popularity <- Recommender(R[943:1], method = "POPULAR")
+names(getModel(recommender_popularity))
+getModel(recommender_popularity)$topN
+```
+
+Create top 10 recommendations for 3 users
+
+```{r}
+recom <- predict(recommender_popularity, R[1:3], n=10)
+recom
+as(recom, "list")
+```
+#### Evaluation
+
+splitting the data into train and test
+
+```{r}
+eval<- evaluationScheme(R,method = "split", given = 15, train=0.5, goodRating=4)
+eval
+
+```
+Building a recommender model using user based collaborative filtering
+
+```{r}
+userbased_model<- Recommender(getData(eval,"train"), "UBCF")
+userbased_model
+```
+Evaluation of top-N recommender algorithm using the Given-3 protocol i.e, for the test users all but 3 are withheld for evaluation.
+
+```{r}
+scheme<- evaluationScheme(R, method="cross",k=4, given=3, goodRating=4)
+scheme
+```
+Using the created evaluating scheme to evaluate the recommender method popular evaluating the top 1, 3, 5, 10,15,20 recommendation lists
+
+```{r}
+results<- evaluate(scheme, method = "POPULAR", type="topNList", n=c(1,3,5,10,15,20))
+results
+getConfusionMatrix(results)[[1]]
+
+```
+#### From the confusion matrix we can see each user recommendations has good amount of True postives and negatives which implies that model built has a good accuracy.
+
+
+\newpage
+### Question 2:
+#### 2)	Data released from the US department of Commerce, Bureau of the Census is available in R (see, data(state) ).
+
+Read the data
+
+```{r}
+data(state)
+dats <- state.x77
+head(dats)
+```
+scale the data
+
+```{r}
+dats_scale <- scale(dats)
+```
+
+#### a) Focus on the data Population, Income, Illiteracy, Life Exp, Murder, HS Grad, Frost, Area
+
+#### Cluster this states using hierarchical clustering. Keep the class labels (region, or state name) in mind, but do not use them in the modeling.
+
+```{r}
+d <- dist(dats_scale)
+dim(as.matrix(d))
+hc <- hclust(d,  method = "complete")
+plot(hc, hang = -1,cex=0.6)
+```
+
+#### b) Cluster the states using k-means. Justify your choice of k.
+
+First we need to find the optimal number of clusters (K). In order to achieve this I have plotted an elbow plot.
+
+```{r}
+# calculate within-cluster sum of squares (WCSS) for different values of k
+wcss <- c()
+for (i in 1:25) {
+  kmeans_fit <- kmeans(dats_scale, centers=i, nstart=25)
+  wcss[i] <- kmeans_fit$tot.withinss
+}
+
+# plot elbow curve
+#x11()
+plot(1:25, wcss, type="b", pch=19, frame=FALSE, 
+     xlab="Number of clusters (k)", ylab="WCSS")
+```
+
+From the elbow plot the optimal cluster can be k = 3, 4, 5. So to further optimize I checked the  silhouette plots of the cut trees.
+
+```{r}
+ct3 <- cutree(hc, k = 3)
+si3 <- silhouette(ct3, dist = d)
+plot(si3)
+```
+
+```{r}
+ct4 <- cutree(hc, k = 4)
+si4 <- silhouette(ct4, dist = d)
+plot(si4)
+```
+
+```{r}
+ct5 <- cutree(hc, k = 5)
+si5 <- silhouette(ct5, dist = d)
+plot(si5)
+```
+
+From the silhouette plots we could observe that K = 5 has better clustering Because it has uniform distribution of datapoints between the clusters and has uniform pattern of clusters and also has less negative values.
+
+
+```{r}
+#Run k-means on the scaled dataset
+set.seed(123)
+km3 <- kmeans(dats_scale, centers = 5, nstart = 10)
+
+# plot the groups
+#x11()
+plot(dats_scale, col = km3$cluster, main = "k-means clustering state dataset" )
+points(km3$centers, col = 1:5, pch = 8, cex= 2)
+```
+
+#### c) In your opinion, does k-means or hierarchical performs better. Justify your answer.
+
+#### Hierarchical clustering may be more appropriate if the goal is to identify hierarchical relationships among the states
+
+#### While k-means clustering may be more appropriate if the goal is to identify distinct groups or cluster of states based on their socioeconomic characteristics.
+
+#### From the dendrogram we can clearly observe the similarities between different states and cluster formation hierarchy but it's hard to find the optimal number of clusters as there are so many clusters in the dendrogram and it becomes difficult to cluster the states and in K-means it is very easy to identify clusters plus it is computationally inexpensive. but in sillhoutte plots we can see that k-means getting effected with outliers. we can just avoid this my removing outliers while preprocessing the data. or choosing the right K value will help in clustering the outlier point in a seperate cluster.
+
+#### So in total if our goal is to cluster the states on socioeconomic characteristics I feel k-means would be the better option to cluster and it is computationally inexpensive as well.
+
+\newpage
+### Question 3:
+#### Consider the Iris data (>data(iris)).
+
+Read the data
+```{r}
+data(iris)
+dataset <- iris
+head(dataset)
+```
+#### a) Create a plot using the first two principal components, and color the iris species by class.
+
+PCA
+
+```{r}
+fit <- prcomp(dataset[,1:4], center=TRUE, scale=TRUE)
+```
+
+Extracting and combining first two principal components, PC1 and PC2 and combining with species columns.
+
+```{r}
+PC1 <- fit$x[,1]
+PC2 <- fit$x[,2] 
+PC_dats <- cbind(PC1, PC2)
+PC_dats_df <- as.data.frame(PC_dats)
+PC_dats_df$Species <- dataset$Species
+```
+
+Creating a plot with PC1 and PC2 and coloring the iris species by class.
+
+```{r}
+#x11()
+ggplot(PC_dats_df, aes(x = PC1, y = PC2, color = Species)) +
+  geom_point() +
+  labs(x = "PC1", y = "PC2", title = "PC1 and PC2 plot of Iris dataset") +
+  theme_minimal()
+```
+
+#### b) Perform k-means clustering on the first two principal components of the iris data. Plot the clusters different colors, and the specify different symbols to depict the species labels.
+
+Run k-means on the PC values
+
+```{r}
+set.seed(123)
+km2 <- kmeans(PC_dats, centers = 3, nstart = 10)
+```
+
+create a vector of symbols corresponding to each cluster
+
+```{r}
+#x11()
+#use different integers for each cluster
+cluster_symbols <- c(2, 3, 4) 
+```
+
+Plot the groups
+
+```{r}
+plot(PC_dats, col = km2$cluster,pch = cluster_symbols[km2$cluster], main = "k-means clustering plot of PC1 & PC2" )
+points(km2$centers, col = 1:3, pch = 8, cex= 2)
+# add legend for symbols
+legend("topright", legend = c("setosa", "vercicolor", "virginicia"), pch = cluster_symbols, col = 1:3)
+```
+
+#### c) Use rand index and adjusted rand index to assess how well the cluster assignments capture the species labels.
+
+```{r}
+rand.index(km2$cluster, as.numeric(iris$Species))
+adj.rand.index(km2$cluster, as.numeric(iris$Species))
+```
+#### d) Use the gap statistic and silhouette plots to determine the number of clusters.
+
+Gap statistics - K-means clustering
+
+```{r}
+gap_kmeans <- clusGap(PC_dats, kmeans, nstart = 20, K.max = 10, B = 100)
+#x11()
+plot(gap_kmeans, main = "Gap Statistic: k-means plot")
+```
+Silhouette plot - K-means clustering.
+
+```{r}
+sil_width <- silhouette(km2$cluster, dist(PC_dats))
+#x11()
+plot(sil_width, main = "Silhouette : k-means plot")
+```
+
+#### e) Reflect on the results, especially c-d. What does this tell us about the clustering?
+
+##### 1.From the rand index and adjusted rand index, we can infer that the actual species labels (iris-Species) are only slightly different from the k-means clustering solution labels (km2-cluster). 
+##### 2.Approximately 83.22% of data point pairs have the same cluster assignments in both the predicted and actual clusters, according to the Rand Index, which stands at 0.8322148. 
+##### 3.The agreement between the predicted and actual clusters is better than would be predicted by chance, according to the Adjusted Rand Index of 0.6201352, but there is still space for growth.
+##### 4.From the "Gap Statistic: k-means plot" we could see that gap static reaches it's maximum at 3. So the optimal number of clusters for iris data set is 3.
+##### 5.From the "Silhouette : k-means plot" we can interpret that the cluster quality is good. For each cluster the bar chart is pretty balanced and similar and there no negative values, implying good quality clustering.
+##### There is also nearly uniform no.of data points between the 3 clusters like 50, 53, 47 this implies that the clustering and structure is good for k=3.

@@ -1,0 +1,646 @@
+---
+title: "Homework 3"
+author: "Manikanta Kalyan Gokavarapu"
+date: "`r Sys.Date()`"
+output:
+  pdf_document:
+    latex_engine: xelatex
+  word_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Loading Packages:
+```{r}
+library(ggplot2)
+library(datasets)
+library("cluster")
+library("multtest")
+library("fpc")
+library("bootcluster")
+library("fossil")
+library(igraph)
+library(igraphdata)
+```
+
+\newpage
+### Question 1:
+
+#### Suppose that for a particular data set, we perform hierarchical clustering using single linkage and using complete linkage. We obtain two dendrograms.
+
+#### (a) At a certain point on the single linkage dendrogram, the clusters {1, 2, 3} and {4, 5} fuse. On the complete linkage dendrogram, the clusters {1, 2, 3} and {4, 5} also fuse at a certain point. Which fusion will occur higher on the tree, or will they fuse at the same height, or is there not enough information to tell?
+
+#### Answer:
+
+
+Given {1,2,3} and {4,5} fuse.
+
+To understand at what height these clusters {1,2,3} and {4,5} merge, we need to consider the dissimilarity matrix to answer the question:
+
+Assume that,
+
+The dissimilarity between {1,4} is 1
+
+The dissimilarity between {1,5} is 2
+
+The dissimilarity between {2,4} is 3
+
+The dissimilarity between {2,5} is 4
+
+The dissimilarity between {3,4} is 5
+
+The dissimilarity between {3,5} is 6
+
+So as we consider minimum height in single linkage, The clusters {1,2,3} and {4,5} merge at a height of 1.
+
+But if the dissimilarity between all the possibilities changes and remains the same value. For example if the dissimilarity between {1,4},{1,5},{2,4},{2,5},{3,4},{3,5} all turn to 3 then the  clusters {1,2,3} and {4,5} merge at a height of 3.
+
+So as don't have one specific answer for the given data. We can say that there is not enough information to tell where the clusters fuse
+
+#### (b) At a certain point on the single linkage dendrogram, the clusters {5} and {6} fuse. On the complete linkage dendrogram, the clusters {5} and {6} also fuse at a certain point. Which fusion will occur higher on the tree, or will they fuse at the same height, or is there not enough information to tell?
+
+#### Answer:
+
+Given {5} and {6} fuse.
+
+To understand at what height these single elements {5} and {6} merge, we need to consider the dissimilarity matrix to answer the question:
+
+Assume that,
+
+The dissimilarity between {5,6} is 4, so cluster {5,6} forms at height of 4 in single linkage.
+
+The dissimilarity between {5,6} is 4, so cluster {5,6} forms at height of 4 in complete linkage.
+
+So, Answer will be they will fuse at same height in both single and complete linkages.
+
+\newpage
+### Question 2:
+
+#### In this problem, you will generate simulated data, and then perform PCA and K-means clustering on the data.
+
+#### (a) Generate a simulated data set with 20 observations in each of three classes (i.e. 60 observations total), and 50 variables.
+#### Hint: There are a number of functions in R that you can use to generate data. One example is the rnorm() function; runif() is another option. Be sure to add a mean shift to the observations in each class so that there are three distinct classes.
+
+Creating the needed data set with three classes and mean shift in each class.
+
+```{r}
+set.seed(123)
+data <- matrix(c(rnorm(20 * 50, mean = 1),               
+                          rnorm(20 * 50, mean = 2),
+                          rnorm(20 * 50, mean = 3)), ncol = 50, byrow = TRUE)
+true_labels <- unlist(lapply(1:3,function(x){rep(x,20)}))
+```
+
+#### (b) Perform PCA on the 60 observations and plot the first two principal component score vectors. Use a different color to indicate the observations in each of the three classes. If the three classes appear separated in this plot, then continue on to part (c). If not, then return to part (a) and modify the simulation so that there is greater separation between the three classes. Do not continue to part (c) until the three classes show at least some separation in the first two principal component score vectors.
+
+Applying the PCA on data and plotting the first two principal components
+
+```{r}
+set.seed(123)
+fit <- prcomp(data)
+PC1 <- fit$x[,1]
+PC2 <- fit$x[,2]
+plot(PC1, PC2, col=true_labels)
+```
+
+From the plot we can say there is good separation between the three classes created.
+
+#### (c) Perform K-means clustering of the observations with K = 3. How well do the clusters that you obtained in K-means clustering compare to the trueclass labels?
+#### Hint: You can use the table() function in R to compare the true class labels to the class labels obtained by clustering. Be careful how you interpret the results: K-means clustering will arbitrarily number the clusters, so you cannot simply check whether the true class labels and clustering labels are the same
+
+Perform k-means cluster with k=3 and plot the table data which true vs cluster labels.
+
+```{r}
+set.seed(123)
+km <- kmeans(data, 3, nstart = 60)
+table(true_labels,km$cluster)
+```
+
+Calculate the adjusted Rand Index.
+
+
+```{r}
+adj.rand.index(true_labels,km$cluster)
+```
+Label the data with cluster labels obtained from k-means.
+
+
+```{r}
+# create a data frame with the PC1 and PC2 scores and cluster labels
+df <- data.frame(PC1 = PC1, PC2 = PC2, Cluster = as.factor(km$cluster))
+
+# plot the data points colored by the cluster labels
+ggplot(df, aes(x = PC1, y = PC2, color = Cluster)) +
+  geom_point() +
+  labs(color = "Cluster") +
+  theme_minimal()
+```
+
+As adjusted rand index =1, we can say there is a perfect agreement between the true class labels and clustering labels we got from k-means.
+
+From table data we can see that the data is perfectly clustered and each cluster has 20 observations.
+
+you can see k-means plot when k=3 the cluster labels are perfectly assigned to data points.
+
+
+#### (d) Perform K-means clustering with K = 2. Describe your results.
+
+Applying k-means for k=2 and plotting table data between true labels vs cluster labels
+
+```{r}
+set.seed(123)
+km2 <- kmeans(data, 2, nstart = 60)
+table(true_labels,km2$cluster)
+```
+Calculate Adjusted Rand Index.
+
+```{r}
+adj.rand.index(true_labels,km2$cluster)
+```
+Label the data with cluster labels obtained from k-means.
+
+```{r}
+# create a data frame with the PC1 and PC2 scores and cluster labels
+df <- data.frame(PC1 = PC1, PC2 = PC2, Cluster = as.factor(km2$cluster))
+# plot the data points colored by the cluster labels
+ggplot(df, aes(x = PC1, y = PC2, color = Cluster)) +
+  geom_point() +
+  labs(color = "Cluster") +
+  theme_minimal()
+```
+
+The adjusted rand index came down to 0.56 when we only take 2 clusters because 20 observation are assigned to one cluster and remaining 40 observations are assigned to other cluster in K-means.
+
+So, there is an increase in no.of observations in a single cluster because of having only two clusters.
+
+You can see result of clustering labels in k-means plot above.
+
+
+#### (e) Now perform K-means clustering with K = 4, and describe your results.
+
+Applying k-means for k=4 and plotting table data between true labels vs cluster labels
+
+```{r}
+set.seed(123)
+km3 <- kmeans(data, 4, nstart = 60)
+table(true_labels,km3$cluster)
+```
+
+Label the data with cluster labels obtained from k-means when k=4.
+
+```{r}
+# create a data frame with the PC1 and PC2 scores and cluster labels
+df <- data.frame(PC1 = PC1, PC2 = PC2, Cluster = as.factor(km3$cluster))
+# plot the data points colored by the cluster labels
+ggplot(df, aes(x = PC1, y = PC2, color = Cluster)) +
+  geom_point() +
+  labs(color = "Cluster") +
+  theme_minimal()
+```
+
+From the table output we can observe that class2 is further divided into two clusters 1,4 in K-means.
+
+This is unnecessary clustering of one class which we can observe in the k-means plot above
+also.
+
+#### (f) Now perform K-means clustering with K = 3 on the first two principal component score vectors, rather than on the raw data. That is, perform K-means clustering on the 60 × 2 matrix of which the first column is the first principal component score vector, and the second column is the second principal component score vector. Comment on the results.
+
+Perform k means with k=3 on the first two principal components.
+
+```{r}
+PC_dats <- cbind(PC1, PC2)
+set.seed(123)
+km4 <- kmeans(PC_dats, 3, nstart = 60)
+table(true_labels,km4$cluster)
+```
+Calculate adjusted Rand Index.
+
+```{r}
+adj.rand.index(true_labels,km4$cluster)
+```
+
+Label the data with cluster labels obtained from k-means when k=3 on PC data.
+
+```{r}
+# create a data frame with the PC1 and PC2 scores and cluster labels
+df <- data.frame(PC1 = PC1, PC2 = PC2, Cluster = as.factor(km4$cluster))
+# plot the data points colored by the cluster labels
+ggplot(df, aes(x = PC1, y = PC2, color = Cluster)) +
+  geom_point() +
+  labs(color = "Cluster") +
+  theme_minimal()
+```
+
+We can see a perfect clustering as same as in c which is expected and the rand index =1
+
+And from table data we can see each cluster has 20 observations.
+
+#### (g) Using the scale() function, perform K-means clustering with K = 3 on the data after scaling each variable to have standard deviation one. How do these results compare to those obtained in (b)? Explain.
+
+Perform K-means with k=3 on scaled data which will have SD of 1.
+
+```{r}
+set.seed(123) 
+scaled_data <- scale(data)
+km5 <- kmeans(scaled_data, 3, nstart = 60)
+table(true_labels,km5$cluster)
+```
+
+
+Calculate the Adjusted Rand Index.
+
+```{r}
+adj.rand.index(true_labels,km5$cluster)
+```
+
+Label the data with cluster labels obtained from k-means when k=3 on Scaled data.
+
+```{r}
+# create a data frame with the PC1 and PC2 scores and cluster labels
+df <- data.frame(PC1 = scale(PC1), PC2 = scale(PC2), Cluster = as.factor(km5$cluster))
+# plot the data points colored by the cluster labels when k=3 on scaled data.
+ggplot(df, aes(x = scale(PC1), y = scale(PC2), color = Cluster)) +
+  geom_point() +
+  labs(color = "Cluster") +
+  theme_minimal()
+```
+
+As the data is well separated into three classes we can still see that the data is perfectly clustered on the scaled data as well.
+
+And the adjusted rand index is 1 and also we have 20 observations per clusters for 3 clusters which implying perfect clustering.
+
+In b and g in both places we could see data is well separated into three classes and have perfect clustering. but as we scaled the data the axis scale changes that all.
+
+\newpage
+### Question 3:
+
+#### On the book website, www.statlearning.com, there is a gene expression data set(Ch12Ex13.csv) that consists of 40 tissue samples with measurements on 1,000 genes. The first 20 samples are from healthy patients, while the second 20 are from a diseased group.
+
+#### (a) Load in the data using read.csv(). You will need to select header = F.
+
+
+Loading the genedata with header false.
+
+```{r}
+genedata <- read.csv("Ch12Ex13.csv",header = FALSE)
+head(genedata)
+```
+
+#### (b) Apply hierarchical clustering to the samples using correlation based distance, and plot the dendrogram. Do the genes separate the samples into the two groups? 
+
+Applying hierarchical clustering on correlation based distance matrix.
+
+```{r}
+#create correlation based distance matrix
+d <- dist(cor(genedata))
+
+#apply hierarchical clustering on the distance matrix with different type of linkages.
+#x11()
+par(mfrow=c(2,2))
+hc <- hclust(d, method = "ave")
+plot(hc,hang=-1)
+hc1 <- hclust(d, method = "complete")
+plot(hc1,hang=-1)
+hc2 <- hclust(d, method = "single")
+plot(hc2,hang=-1)
+hc3 <- hclust(d, method = "centroid")
+plot(hc3,hang=-1)
+```
+
+Plot the cutree two understand the groupings in clusterings.
+
+
+```{r}
+ct <- cutree(hc, k = 2)
+ct
+ct1 <- cutree(hc1, k = 2)
+ct1
+ct2 <- cutree(hc2, k = 2)
+ct2
+ct3<- cutree(hc3, k = 2)
+ct3
+```
+
+From the dendrogram plots we can see that genes separate the samples into two distinct groups . 
+
+From the cutree results we can see that the first 20 tissue samples are assigned  one group and second 20 tissue samples assigned into another group.
+
+In most of the linkages the 2 groups are evident but in some types of linkages like centroid they are not that clear and also the dendrograms of all the linkages are not that similar. so we can say that the results depend on linkage used.
+
+#### (c) Your collaborator wants to know which genes differ the most across the two groups. Suggest a way to answer this question, and apply it here.
+
+Approach:
+
+To know which genes differ the most across two groups first we need to perform PCA on the gene data.
+
+Then we perform k-means clustering on the first two principal components and check if we have good separation between the data points.
+
+If there is good separation between the groups, we need to check which genes differ the most
+across the two groups. To do so we need to get each gene's weight, In order to do that we will look at the absolute values of the total loadings for each gene.
+
+Applying K-means on PCdata of genes.
+
+```{r}
+set.seed(123)
+fit1 <- prcomp(genedata)
+PC1 <- fit1$x[,1]
+PC2 <- fit1$x[,2]
+```
+
+
+```{r}
+# run k-means on the PC values
+PC_data <- cbind(PC1, PC2)
+k_means <- kmeans(PC_data, centers = 2)
+
+```
+
+
+```{r}
+# plot the groups
+#x11()
+plot(PC_data, col = k_means$cluster, main = "k-means plot of PC_data")
+points(k_means$centers, col = 1:2, pch = 8, cex= 2)
+```
+
+From the k-means plot above we can say there is a good separation between gene data.
+
+Below Performing PCA on transpose of gene expression data and plotting summary.
+
+
+```{r}
+pca_transpose_data <- prcomp(t(genedata))
+summary(pca_transpose_data)
+```
+
+We will identify the top 15 genes with the highest contribution to the first principal component.
+
+```{r}
+total_load <- apply(pca_transpose_data$rotation, 1, sum)
+index = order(abs(total_load), decreasing = TRUE)
+index[1:15]
+```
+Above are the 15 genes that differ the most across the two groups i.e. healthy and diseased patients.
+
+
+\newpage
+### Question 4:
+
+#### Consider the two networks “karate" and “kite", which are available in the package “igraphdata".
+#### library(igraphdata)
+#### data(karate)
+#### karate
+#### data(kite)
+#### ?kite
+
+
+#### (a) Focus on the karate network. Create noisy datasets. Do this by deleting 5% of the edges randomly (track which ones they are). Perform MCMC for a random graph model (as in Clauset et al.) on this data followed by link-prediction. Are you able to predict the edges that you deleted?
+
+```{r}
+#Load the needed data.
+data(karate)
+data(kite)
+```
+
+Deleted 5% of edges randomly and created noisy karate data set.
+
+```{r}
+
+set.seed(123)
+deleted_edges <- sample(E(karate), size = 0.05 * ecount(karate))
+#deleted_edges
+noisy_karate <- delete.edges(karate, deleted_edges)
+
+#sanity check
+ecount(karate)
+ecount(noisy_karate)
+```
+
+performing MCMC using hierarchical random graph model on noisy_karate data and plotting dendrogram.
+
+
+```{r}
+set.seed(123)
+mcmc_noisy_karate <- fit_hrg(noisy_karate)
+
+#Plotting dendrogram
+set.seed(123)
+plot_dendrogram(mcmc_noisy_karate)
+```
+
+
+```{r}
+#Predict missing edges of noisy_karate data
+set.seed(123)
+pred_edges <- predict_edges(noisy_karate)
+#print(pred_edges)
+
+#List predicted edges that are same as deleted edges.
+selected_pred_edges <- pred_edges$edges[c(6, 72, 124), ]
+selected_pred_edges
+deleted_edges
+```
+
+observation: In the above output, we see the predicted and deleted edges, from that we can say that all the deleted edges are predicted. But based on probability in top 10 of predicted edges we have only one deleted edge.
+
+#### (b) Focus on the yeast network (or kite network if yeast is too big). Create noisy datasets. Do this by deleting 5% of the edges randomly (track which ones they are). Perform MCMC on this data followed by link-prediction. Are you able to predict the edges that you deleted at random well?
+
+```{r}
+data(kite)
+#Deleted 5% of edges randomly and created noisy kite data set.
+set.seed(123)
+deleted_edges1 <- sample(E(kite), size = 0.05 * ecount(kite) + 1)
+#deleted_edges
+noisy_kite <- delete.edges(kite, deleted_edges1)
+#sanity check
+ecount(kite)
+ecount(noisy_kite)
+```
+
+performing MCMC using hierarchical random graph model on noisy_karate data and plotting dendrogram.
+
+
+```{r}
+set.seed(123)
+mcmc_noisy_kite <- fit_hrg(noisy_kite)
+
+#Plotting dendrogram
+set.seed(123)
+plot_dendrogram(mcmc_noisy_kite)
+```
+
+
+```{r}
+#Predict missing edges of noisy_karate data
+set.seed(123)
+pred_edges1 <- predict_edges(noisy_kite)
+#print(pred_edges1)
+
+#List predicted edges that are same as deleted edges.
+selected_pred_edges1 <- pred_edges1$edges[c(16), ]
+selected_pred_edges1
+deleted_edges1
+```
+
+observation:
+
+In the above output, we see the predicted and deleted edges, from that we can say that all the deleted edges are predicted. But based on probability in top 10 of predicted edges, we have no deleted edges. (5% of kite data will result in number of deleted edges = 0.8 = 0. so I have taken one edge and done the analysis)
+
+
+#### (c) Repeat the exercise in part (a) and (b) after deleting 10%, and 20% of the edges. Comment on your findings.
+
+
+```{r}
+#Delete 10% of edges randomly and create noisy karate data set.
+set.seed(123)
+deleted_edges3 <- sample(E(karate), size = 0.1 * ecount(karate))
+#deleted_edges
+noisy_karate_10 <- delete.edges(karate, deleted_edges3)
+
+#sanity check
+ecount(karate)
+ecount(noisy_karate_10)
+```
+Performing MCMC using hierarchical random graph model on noisy_karate data and Plotting dendrogram.
+
+```{r}
+set.seed(123)
+mcmc_noisy_karate_10 <- fit_hrg(noisy_karate_10)
+set.seed(123)
+plot_dendrogram(mcmc_noisy_karate_10)
+```
+
+predicted vs deleted edges.
+
+```{r}
+#Predict missing edges of noisy_karate data
+set.seed(123)
+pred_edges2 <- predict_edges(noisy_karate_10)
+#pred_edges2
+
+#List predicted edges that are same as deleted edges.
+deleted_edges3
+selected_pred_edges2 <- pred_edges2$edges[c(100,10,62,427,393,1,31), ]
+selected_pred_edges2
+```
+
+
+
+```{r}
+#Delete 20% of edges randomly and create noisy karate data set.
+set.seed(123)
+deleted_edges4 <- sample(E(karate), size = 0.2 * ecount(karate))
+#deleted_edges
+noisy_karate_20 <- delete.edges(karate, deleted_edges4)
+#sanity check
+ecount(karate)
+ecount(noisy_karate_20)
+```
+
+Performing MCMC using hierarchical random graph model on noisy_karate data Plotting dendrogram.
+
+
+```{r}
+set.seed(123)
+mcmc_noisy_karate_20 <- fit_hrg(noisy_karate_20)
+set.seed(123)
+plot_dendrogram(mcmc_noisy_karate_20)
+```
+
+predicted edges vs deleted edges:
+
+
+```{r}
+#Predict missing edges of noisy_karate data
+set.seed(123)
+pred_edges3 <- predict_edges(noisy_karate_20)
+#pred_edges3
+#List predicted edges that are same as deleted edges.
+deleted_edges4
+selected_pred_edges3 <- pred_edges3$edges[c(50,73,14,298,313,1,71,63,40,10,8,12,41,11,93), ]
+selected_pred_edges3
+```
+
+```{r}
+#Delete 10% of edges randomly and create noisy kite data set.
+set.seed(123)
+deleted_edges5 <- sample(E(kite), size = 0.1 * ecount(kite))
+#deleted_edges
+noisy_kite_10 <- delete.edges(kite, deleted_edges5)
+#sanity check
+ecount(kite)
+ecount(noisy_kite_10)
+```
+
+Performing MCMC using hierarchical random graph model on noisy_kite data and plotting dendrogram.
+
+```{r}
+set.seed(123)
+mcmc_noisy_kite_10 <- fit_hrg(noisy_kite_10)
+set.seed(123)
+plot_dendrogram(mcmc_noisy_kite_10)
+```
+
+Predicted edges vs deleted edges.
+
+```{r}
+#Predict missing edges of noisy_kite data
+set.seed(123)
+pred_edges4 <- predict_edges(noisy_kite_10)
+#pred_edges4
+#List predicted edges that are same as deleted edges.
+deleted_edges5
+selected_pred_edges4 <- pred_edges4$edges[c(16), ]
+selected_pred_edges4
+```
+
+```{r}
+#Delete 20% of edges randomly and create noisy kite data set.
+set.seed(123)
+deleted_edges6 <- sample(E(kite), size = 0.2 * ecount(kite))
+#deleted_edges
+noisy_kite_20 <- delete.edges(kite, deleted_edges6)
+#sanity check
+ecount(kite)
+ecount(noisy_kite_20)
+```
+
+Performing MCMC using hierarchical random graph model on noisy_kite data and plotting dendrogram.
+
+
+```{r}
+set.seed(123)
+mcmc_noisy_kite_20 <- fit_hrg(noisy_kite_20)
+set.seed(123)
+plot_dendrogram(mcmc_noisy_kite_20)
+```
+
+Predicted vs Deleted Edges.
+
+
+```{r}
+#Predict missing edges of noisy_kite data
+set.seed(123)
+pred_edges5 <- predict_edges(noisy_kite_20)
+#pred_edges5
+#List predicted edges that are same as deleted edges.
+deleted_edges6
+selected_pred_edges5 <- pred_edges5$edges[c(17,7,1), ]
+selected_pred_edges5
+```
+
+Observations:
+
+When we remove 10% of edges in karate data we can see that all the deleted edges are predicted at indexes 100,10,62,427,393,1,31 in predicted edge matrix. Based on probability in top 10 predicted edges, we have 2 deleted edge predictions. 
+
+When we remove 20% of edges in karate data we can see that all the deleted edges are predicted at indexes 50,73,14,298,313,1,71,63,40,10,8,12,41,11,93 in predicted edge matrix . Based on probability in top 20 predicted edges, we have 5 deleted edge predictions. 
+
+When we remove 10% of edges in kite data we can see that only one edge is deleted and it is predicted at index 16 in predicted edges matrix. Based on probability in top 10 predicted edges, we have no deleted edge predictions.
+
+When we remove 20% of edges in kite data we can see that only 3 edges are deleted and these 3 edges are predicted at index 17,7,1 in predicted edges matrix. Based on probability in top 10 predicted edges, we have 2 deleted edge predictions.
+
+
+
+

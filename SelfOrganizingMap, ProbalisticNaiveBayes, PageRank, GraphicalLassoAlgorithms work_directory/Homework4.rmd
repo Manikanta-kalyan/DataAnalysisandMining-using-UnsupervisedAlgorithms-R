@@ -1,0 +1,921 @@
+---
+title: "Homework 4"
+author: "Manikanta Kalyan Gokavarapu"
+date: "`r Sys.Date()`"
+output:
+  pdf_document:
+    latex_engine: xelatex
+  word_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+Loading Packages:
+```{r}
+library(ggplot2)
+library(reshape2)
+library(kohonen)
+library(ggbiplot)
+library(cluster)
+library(factoextra)
+library('glasso')
+library('graph')
+library('recommenderlab')
+library("cluster")
+library('kohonen')
+library('ggplot2')
+library('corrplot')
+library('igraph')
+library('corrplot')
+library("multtest")
+library("fpc")
+library("bootcluster")
+library("fossil")
+library('Rgraphviz')
+library('ggm')
+library('bnlearn')
+library('glasso')
+library('graph')
+library('igraph')
+library(multtest)
+library('fpc')
+library('bootcluster')
+library('fossil')
+library ('ggm')
+library('bnlearn')
+library('gRain')
+#library('gRim')
+library('gRbase')
+#library(devtools)
+library('huge')
+#library('glmpath')
+```
+
+\newpage
+### Question 1: Consider the “cad1” data set in the package gRbase. There are 236 observations on fourteen variables from the Danish Heart Clinic. 
+
+#### a) Use a structural learning algorithm to infer a Bayesian Network for the cad1 data. Be sure to consider the nature of the variables in your dataset, and your knowledge about variable ordering. 
+
+#### Answer:
+
+```{r}
+data(cad1)
+cad_copy = cad1
+head(cad_copy)
+
+```
+
+```{r}
+ block <- c(1, 3, 3, 4, 4, 4, 4, 1, 2, 1, 1, 1, 3, 2) #assign variables a block
+blM <- matrix(0, nrow = 14, ncol = 14)
+rownames(blM) <- names(cad_copy)
+colnames(blM) <- names(cad_copy)
+# fill in the illegal edges
+for (b in 2:4){
+blM[block == b, block < b] <- 1
+}
+blackL <- data.frame(get.edgelist(as(blM, "igraph")))
+names(blackL) <- c("from", "to")
+#Refit the network under the new constraints
+cad.bn2 <- hc(cad1, blacklist = blackL)
+net.constr <- as(amat(cad.bn2), "graphNEL")
+plot(net.constr )
+```
+
+
+
+#### b) Use a structural learning algorithm to infer a Bayesian Network for the cad1 data. Be sure to consider the nature of the variables in your dataset, and your knowledge about variable ordering. 
+
+#### Answer
+```{r}
+### Fit the data to Bayesian network
+bnfit = bn.fit(cad.bn2 , cad1)
+
+```
+
+```{r}
+### Here are d-seperations  for D-Seperated variables
+dsep(cad.bn2 , 'Sex' , 'SuffHeartF' , 'Smoker')
+
+```
+
+```{r}
+dsep(cad.bn2 , 'Sex' , 'SuffHeartF' , 'Smoker')
+
+```
+#### c) Use a structural learning algorithm to infer a Bayesian Network for the cad1 data. Be sure to consider the nature of the variables in your dataset, and your knowledge about variable ordering.
+
+#### Answer:
+
+```{r}
+ dsep(cad.bn2 , 'Sex' , 'SuffHeartF' , 'Smoker')
+```
+
+
+#### d) Use a structural learning algorithm to infer a Bayesian Network for the cad1 data. Be sure to consider the nature of the variables in your dataset, and your knowledge about variable ordering. 
+
+#### Answer
+```{r}
+cpquery(bnfit, event = (CAD == "Yes"), evidence = (QWave == "Yes"&AMI =='Definite'))
+```
+
+
+\newpage
+### Question 2: Consider the wine quality data. 
+
+#### Suppose that for a particular data set, we perform hierarchical clustering using single linkage and using complete linkage. We obtain two dendrograms.
+
+#### (a) Perform exploratory data analysis on the data. Summarize the data quality and characteristics. Discuss any outliers and associations. 
+
+#### Answer:
+
+```{r}
+# Load the red wine and white wine data sets
+red_wine <- read.csv("D:/University at Buffalo CSE/Spring Semester 2023/STA 546 DataM II/R/Assignment 4 work_directory/winequality-red.csv", header = TRUE, sep = ";")
+white_wine <- read.csv("D:/University at Buffalo CSE/Spring Semester 2023/STA 546 DataM II/R/Assignment 4 work_directory/winequality-white.csv", header = TRUE, sep = ";")
+dim(red_wine)
+dim(white_wine)
+
+```
+
+```{r}
+##EDA
+# Create a histogram of red wine w.r.t different attributes.
+par(mfrow=c(2,2))
+hist(red_wine[,2], breaks = 25, main = "red_wine,volatile_acidity", xlab = "Volatile acidity")
+hist(red_wine[,3], breaks = 25, main = "red_wine,citric.acid", xlab = "citric.acid")
+hist(red_wine[,4], breaks = 25, main = "red_wine,residual.sugar", xlab = "residual.sugar")
+hist(red_wine[,7], breaks = 25, main = "red_wine,total.sulfur.dioxide", xlab = "total.sulfur.dioxide")
+
+```
+
+
+```{r}
+#Create histogram of white whine w.r.t different attributes
+par(mfrow=c(2,2))
+hist(white_wine[,2], breaks = 25, main = "white_wine,volatile_acidity", xlab = "Volatile acidity")
+hist(white_wine[,3], breaks = 25, main = "white_wine,citric.acid", xlab = "citric.acid")
+hist(white_wine[,4], breaks = 25, main = "white_wine,residual.sugar", xlab = "residual.sugar")
+hist(white_wine[,7], breaks = 25, main = "white_wine,total.sulfur.dioxide", xlab = "total.sulfur.dioxide")
+
+```
+
+
+```{r}
+# Calculate the correlation  matrix of red wine
+corr_matrix <- cor(red_wine)
+melted_corr_matrix <- melt(corr_matrix)
+ggplot(data = melted_corr_matrix, aes(x = Var1, y = Var2, fill = value)) +
+  geom_tile() +
+  scale_fill_gradient2(low = "blue", mid = "white", high = "red",
+                       midpoint = 0, limit = c(-1,1), space = "Lab",
+                       name="Pearson\nCorrelation") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, vjust = 1,
+                                   size = 12, hjust = 1)) +
+  coord_fixed() +
+  labs(title = "red_wine correlation matrix")
+```
+
+
+```{r}
+#calculate the correlation matrix of white wine.
+corr_matrix <- cor(white_wine)
+melted_corr_matrix <- melt(corr_matrix)
+ggplot(data = melted_corr_matrix, aes(x = Var1, y = Var2, fill = value)) +
+  geom_tile() +
+  scale_fill_gradient2(low = "blue", mid = "white", high = "red",
+                       midpoint = 0, limit = c(-1,1), space = "Lab",
+                       name="Pearson\nCorrelation") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, vjust = 1,
+                                   size = 12, hjust = 1)) +
+  coord_fixed() +
+  labs(title = "white_wine correlation matrix")
+
+```
+
+
+```{r}
+# Create a pairplot matrix for red wine
+pairs(red_wine, las=2, main= "redwine_pairplot")
+```
+
+
+```{r}
+# Create a pairplot matrix for white wine
+pairs(white_wine, las=2, main = "whitewine_pairplot")
+```
+
+#### Data Quality and characterstics
+
+```{r}
+# Summarize the dataset
+summary(red_wine)
+summary(white_wine)
+
+```
+
+
+```{r}
+# Examine the structure of red and white whine datasets
+str(red_wine)
+str(white_wine)
+```
+
+
+```{r}
+# Count missing values per variable in red and white wines
+colSums(is.na(red_wine))
+colSums(is.na(white_wine))
+```
+
+
+```{r}
+# Count the number of duplicate rows in red and white wines
+num_duplicates <- sum(duplicated(red_wine))
+print(num_duplicates)
+num_duplicates2 <- sum(duplicated(white_wine))
+print(num_duplicates2)
+```
+#### Outliers and associations
+
+```{r}
+#Create a box plot of red wine.
+boxplot(red_wine)
+```
+
+
+```{r}
+#Create a box plot of white wine.
+boxplot(white_wine)
+```
+
+#### EDA summary of red wines
+#### The red wine data set contains 1599 observations (rows) and 12 variables (columns).
+#### The variables in the red wine data set include various chemical properties such as fixed acidity, volatile acidity, citric acid, residual sugar, chlorides, free sulfur dioxide, total sulfur dioxide, density, pH, sulphates, alcohol, and quality.
+#### The "quality" variable represents the sensory quality of the wines which is ranging from 3 to 8.
+#### From the summary and structure of red wines we could see the mean, median, minimum, maximum, and quartiles for each variable in the dataset. and we could observe there is a central tendency on the spread of the data 
+#### From The structure output we could see that all the variables are of numeric type.
+#### There are no missing values in any variable of red_wine.
+#### There are 240 duplicates in red_wine data set.
+#### From the correlation matrix and pair plots we could obviously see total and free sulfur dioxide are highly related and also denisty and citric.acid are related with fixed acidity.   
+#### From the box plot we could see the outliers exist for variables fixed.acidity, residual.sugar, free.sulfur dioxide, total.sulfur.dioxide
+
+#### EDA summary of white wines
+#### The white wine data set contains 4898 observations (rows) and 12 variables (columns).
+#### The variables in the white wine data set are the same as those in the red wine data set, representing chemical properties and quality.
+#### From the summary and structure of white wines we could see the mean, median, minimum, maximum, and quartiles for each variable in the dataset. and we could observe there is a central tendency on the spread of the data 
+#### From The structure output we could see that all the variables are of numeric type.
+#### There are no missing values in any variable of white_wine.
+#### There are 937 duplicates in white_wine data set.
+#### From correlation matrix and pair plots we could see total and free sulfur dioxide are correlated and also density and residual sugar are linearly correlated.
+#### There are more number of outliers in total and free sulfur dioxide attributes and compartively less number of outliers in residual sugar.
+
+#### (b) Perform PCA on the red wines. What summarizations can you extract from the biplot and scree plots.
+
+#### Answer:
+
+```{r}
+# Exclude non-numeric columns
+numeric_cols <- sapply(red_wine, is.numeric)
+red_wine_numeric <- red_wine[, numeric_cols]
+```
+
+```{r}
+# Perform PCA
+pca <- prcomp(red_wine_numeric, scale. = TRUE)
+```
+
+```{r}
+# Create a scree plot
+plot(pca, type = "lines", main = "Scree Plot of Red wines")
+```
+
+```{r}
+#create a biplot.
+ggbiplot(pca, obs.scale = 1, var.scale = 1, ellipse = TRUE, circle = TRUE) +
+  scale_color_discrete(name = '') +
+  theme(legend.direction = 'horizontal', legend.position = 'top')
+```
+
+
+#### Observations for red wines:
+#### A scree plot captures how much variation each principal component captures in the data
+#### From red wines scree plot we could say that first four principal components  captures most of the variance in the data, so they are enough to describe the data.
+#### From bi-plot between PC1 and PC2 of red wines we could observe that fixed acidity, citric acid, sulphates are in same direction of PC1 so they are positively correlated with PC1
+#### From bi-plot, pH has a negative association with PC1.
+
+
+#### (c) Perform PCA on the white wines. What summarizations can you extract from the biplot and scree plots.
+
+#### Answer:
+
+```{r}
+# Exclude non-numeric columns
+numeric_cols2 <- sapply(white_wine, is.numeric)
+white_wine_numeric <- white_wine[, numeric_cols2]
+```
+
+
+```{r}
+# Perform PCA
+pca2 <- prcomp(white_wine_numeric, scale. = TRUE)
+```
+
+
+```{r}
+# Create a scree plot
+plot(pca2, type = "lines", main = "Scree Plot of white wines")
+```
+
+
+```{r}
+#create a biplot.
+ggbiplot(pca2, obs.scale = 1, var.scale = 1, ellipse = TRUE, circle = TRUE) +
+  scale_color_discrete(name = '') +
+  theme(legend.direction = 'horizontal', legend.position = 'top')
+```
+#### Observations for white wines:
+#### A scree plot captures how much variation each principal component captures in the data
+#### From white wines scree plot we could say that first three principal components  captures most of the variance in the data, so they are enough to describe the data.
+#### From bi-plot between PC1 and PC2 of white wines we could observe that alcohol and quality are in same direction of PC1 so they are positively correlated with PC1
+#### From bi-plot, residual sugar, total and free sulfur dioxide have negative association with PC1 values.
+
+#### (d) Combine the data and perform PCA. Color the biplot according to wine type.
+
+#### Answer:
+
+```{r}
+# Add a column to indicate the wine type
+red_wine$wine_type <- "red"
+white_wine$wine_type <- "white"
+```
+
+```{r}
+# Combine the red wine and white wine datasets
+wine <- rbind(red_wine, white_wine)
+```
+
+```{r}
+# Perform PCA on the combined data
+set.seed(123)
+pca3 <- prcomp(wine[,-ncol(wine)], scale. = TRUE)
+```
+
+
+```{r}
+# Create the biplot
+biplot(pca3, choices = c(1, 2), scale = 0)
+```
+
+
+```{r}
+# Add color to the bi plot according to wine type
+set.seed(123)
+ggbiplot::ggbiplot(pca3, obs.scale = 1, var.scale = 1,
+                   groups = wine$wine_type,
+                   ellipse = TRUE, circle = TRUE) +
+  theme_minimal()
+```
+
+
+#### (e) Perform k-means using the wine data. Justify your choice in “k” and report your findings.
+
+#### Answer:
+
+```{r}
+#Elbow method.
+# Determine the optimal number of clusters using the elbow method
+wcss <- numeric(length = 10)  # Initialize vector to store WCSS values
+# Iterate over different values of k
+for (k in 1:10) {
+  # Perform k-means clustering
+  set.seed(123)
+  kmeans_model <- kmeans(wine[,-ncol(wine)], centers = k, nstart = 10)
+  # Store the within-cluster sum of squares (WCSS)
+  wcss[k] <- kmeans_model$tot.withinss
+}
+# Plot the WCSS values
+plot(1:10, wcss, type = "b", xlab = "Number of Clusters (k)", ylab = "WCSS",
+     main = "Elbow Method for Determining k")
+
+```
+
+#### Basis on the elbow plot above the optimal k value is 2.
+
+
+```{r}
+# Perform k-means clustering with the chosen value of k
+set.seed(123)
+kmeans_model <- kmeans(wine[,-ncol(wine)], centers = 2, nstart = 10)
+# Get cluster assignments for each data point
+cluster_assignments <- as.factor(kmeans_model$cluster)
+table(cluster_assignments)  # Frequency table of cluster assignments
+
+```
+
+
+```{r}
+fviz_cluster(kmeans_model, data = wine[, -ncol(wine)], geom = "point", ellipse.type = "norm")
+```
+
+
+#### The optimal k value is 2 for the wine data as shown in elbow plot. This might be due to two different wines red and white wine data.
+#### From the table output we can see after clustering there is good amount of separation between data and has nearly equal number of points distributed between two clusters. But there is some overlap which can be solved by preprocessing the data further.
+
+
+#### (f) Perform k-means using Principal Components from the wine data. Justify your choice in “k” and report your findings.
+
+#### Answer:
+
+
+```{r}
+# Perform PCA
+pca_k <- prcomp(wine[,-ncol(wine)], scale. = TRUE)
+# Extract PC scores
+PC1_k <- pca_k$x[, 1]
+PC2_k <- pca_k$x[, 2]
+PC_dats <- cbind(PC1_k, PC2_k)
+# Perform k-means clustering with the chosen value of k
+set.seed(123)
+kmeans_model_pc <- kmeans(PC_dats, centers = 2, nstart = 10)
+# Get cluster assignments for each data point
+cluster_assignments_pc <- as.factor(kmeans_model_pc$cluster)
+# Plot the k-means clusters using PC1 and PC2
+# Define a vector of colors for each cluster
+cluster_colors <- c("red", "blue")
+ggplot(wine[,-ncol(wine)], aes(x = PC1_k, y = PC2_k, color = cluster_assignments_pc)) +
+  geom_point() +
+  labs(x = "PC1", y = "PC2", color = "Cluster_assignments_pc") +
+  scale_color_manual(values = cluster_colors) +
+  theme_minimal()
+```
+
+#### Observations:
+#### The optimal value of k is 2 for principal compenent data of wine.
+#### The data is clustered nicely into two groups may be indicating red and white wines.
+#### The no.of data points between the two group are also nearly equal.
+
+#### (g) How do your answers between E and F compare.
+
+#### Answer:
+
+#### Overall, I think E and F are nearly similar plots and also the separation nearly seems same. 
+#### But overall the F cluster separation is better than E as there is no overlap between clusters when plotted w.r.t principal component data.
+#### "E" clustering has better split of number of data points in each cluster.
+
+
+\newpage
+### Question 3: Consider the wine quality data. 
+
+#### (a) Construct a Self Organizing Map that clusters the samples, use a sensible grid choice. Color the  samples on th6e map by wine color. 
+
+```{r}
+ # Load the red wine and white wine data sets
+red_wine <- read.csv("D:/University at Buffalo CSE/Spring Semester 2023/STA 546 DataM II/R/Assignment 4 work_directory/winequality-red.csv", header = TRUE, sep = ";")
+white_wine <- read.csv("D:/University at Buffalo CSE/Spring Semester 2023/STA 546 DataM II/R/Assignment 4 work_directory/winequality-white.csv", header = TRUE, sep = ";")
+dim(red_wine)
+dim(white_wine)
+```
+
+
+```{r}
+# Add a column to indicate the wine type
+red_wine$wine_type <- "red"
+white_wine$wine_type <- "white"
+
+# Combine the red wine and white wine datasets
+wines <- rbind(red_wine, white_wine)
+
+#scale the wines data
+wines.scaled <- scale(wines[,-ncol(wines)])
+```
+
+
+```{r}
+ # fit an SOM
+set.seed(123)
+som_grid <- somgrid(xdim = 5, ydim = 5, topo = "hexagonal")
+wine.som <- som(wines.scaled, grid = som_grid, rlen = 3000)
+```
+
+
+
+```{r}
+#SOM codes
+codes <- wine.som$codes[[1]]
+plot(wine.som, main = "Wines Data")
+```
+
+
+```{r}
+ plot(wine.som, type = "count")
+```
+
+
+```{r}
+d <- dist(codes)
+hc <- hclust(d)
+plot(hc)
+```
+
+
+#### Plot the som with the found clusters here.
+
+```{r}
+ 
+# plot the SOM with the found clusters
+som_cluster <- cutree(hc, h = 6)
+my_pal <- c("red", "white")
+my_bhcol <- my_pal[som_cluster]
+graphics.off()
+plot(wine.som, type = "mapping", col = "black", bgcol = my_bhcol)
+add.cluster.boundaries(wine.som, som_cluster)
+```
+
+
+#### (b) Construct phase-plots for the different variables in the dataset.
+
+```{r}
+#Phase plots for each variable in dataset
+par(mfrow = c(3, 4))
+for (i in 1:12){
+plot(wine.som, type = "changes", property=codes[,i], main = ifelse(is.na(colnames(codes)[i]), "", colnames(codes)[i]))
+}
+```
+
+```{r}
+# phase/Component plane plots for each variable in dataset.
+par(mfrow = c(3, 4))
+for (i in 1:12){
+plot(wine.som, type = "property", property=codes[,i], main = ifelse(is.na(colnames(codes)[i]), "", colnames(codes)[i]))
+}
+```
+
+#### (c) Plot the prototypes on the SOM
+
+```{r}
+# Plot the prototypes on the SOM
+plot(wine.som, type = "codes", bgcol = my_bhcol, main = "Prototypes on SOM")
+```
+
+
+\newpage
+### Question 4: Consider the following webgraphs.
+
+# Read data from CSV file
+
+```{r}
+dataset <- read.csv("D:/University at Buffalo CSE/Spring Semester 2023/STA 546 DataM II/R/Assignment 4 work_directory/titanic.csv")
+```
+
+
+
+
+```{r}
+dim(dataset)
+```
+
+
+
+```{r}
+# Check the structure and summary statistics of the data set
+str(dataset)
+summary(dataset)
+```
+
+
+
+```{r}
+# Calculate the survival rate overall and by different categories
+survival_rate <- mean(dataset$Survived)
+cat("Survival Rate: ", survival_rate, "\n")
+```
+
+
+
+```{r}
+# Is there evidence that women and children were evacuated first?
+# Calculate the survival rate for women and children separately
+women_survival_rate <- mean(dataset$Survived[dataset$Sex == "female"])
+children_survival_rate <- mean(dataset$Survived[dataset$Age < 18])
+cat("Survival Rate for Women: ", women_survival_rate, "\n")
+cat("Survival Rate for Children: ", children_survival_rate, "\n")
+```
+
+
+```{r}
+# Characteristics/demographics more likely in surviving passengers
+# Calculate survival rates by Pclass, Sex, and Age categories
+survival_rate_pclass <- aggregate(Survived ~ Pclass, data = dataset, FUN = mean)
+survival_rate_sex <- aggregate(Survived ~ Sex, data = dataset, FUN = mean)
+survival_rate_age <- aggregate(Survived ~ (Age < 18), data = dataset, FUN = mean)
+```
+
+
+```{r}
+cat("Survival Rate by Pclass:\n")
+print(survival_rate_pclass)
+```
+
+
+```{r}
+cat("Survival Rate by Sex:\n")
+print(survival_rate_sex)
+```
+
+
+```{r}
+
+cat("Survival Rate by Age (<18):\n")
+print(survival_rate_age)
+```
+
+
+```{r}
+# Characteristics/demographics more likely in passengers that perished
+# Calculate the opposite of survival rates for Pclass, Sex, and Age categories
+perished_rate_pclass <- aggregate(Survived ~ Pclass, data = dataset, FUN = function(x) 1 - mean(x))
+perished_rate_sex <- aggregate(Survived ~ Sex, data = dataset, FUN = function(x) 1 - mean(x))
+perished_rate_age <- aggregate(Survived ~ (Age < 18), data = dataset, FUN = function(x) 1 - mean(x))
+```
+
+
+```{r}
+cat("Perished Rate by Pclass:\n")
+print(perished_rate_pclass)
+```
+
+```{r}
+cat("Perished Rate by Sex:\n")
+print(perished_rate_sex)
+```
+
+
+```{r}
+cat("Perished Rate by Age (<18):\n")
+print(perished_rate_age)
+```
+
+
+
+```{r}
+# Probability of survival for specific passengers
+# Define the characteristics of the passengers
+passenger1 <- list(Pclass = 1, Sex = "female", Age = 22)
+passenger2 <- list(Pclass = 3, Sex = "male", Age = 24)
+
+# Calculate the probability of survival for the defined passengers
+prob_survival_passenger1 <- mean(dataset$Survived[dataset$Pclass == passenger1$Pclass &
+                                                  dataset$Sex == passenger1$Sex &
+                                                  dataset$Age == passenger1$Age])
+prob_survival_passenger2 <- mean(dataset$Survived[dataset$Pclass == passenger2$Pclass &
+                                                  dataset$Sex == passenger2$Sex &
+                                                  dataset$Age == passenger2$Age])
+cat("Probability of survival for Passenger 1: ", prob_survival_passenger1, "\n")
+cat("Probability of survival for Passenger 2: ", prob_survival_passenger2, "\n")
+
+```
+#### Yes my analysis supports the movie here passenger 1 is rose travelling in first class age 24 probability of survival is 1 so she survives. and passenger 2 jack male with age 24 chance is surviving is 0.18 which is pretty low.
+
+#### So my results support the popular movie "Titanic"
+
+
+
+\newpage
+### Question 5: Consider the following webgraphs. 
+
+
+#### (a) Compute the PageRank vector of Webgraph A for damping constants p = 0.05, 0.25, 0.50, 0.75, and 0.95. How sensitive is the PageRank vector, and overall ranking of importance, to the damping constant? Does the relative ranking of importance according to PageRank support your intuition?
+
+#### Answer:
+
+```{r}
+nodes <- data.frame(names = c("A", "B", "C", "D" , "E" , "F"))
+```
+
+
+```{r}
+relations <- data.frame(
+from = c("C", "B", "D", "D", "B", "E", "F"),
+to = c("A", "C", "B", "E", "E", "D", "C"))
+g <- graph.data.frame(relations, directed = TRUE, vertices = nodes)
+plot(g)
+
+```
+
+
+```{r}
+#page vector at damping constant 0.05
+pg <- page.rank(g, damping = .05)
+pg$vector
+
+```
+
+```{r}
+#page rank vector at damping constant 0.25
+pg <- page.rank(g, damping = .25)
+pg$vector
+```
+
+
+```{r}
+#page rank vector at damping at 0.50
+pg <- page.rank(g, damping = .5)
+pg$vector
+```
+
+```{r}
+#page rank vector at damping at 0.75
+ pg <- page.rank(g, damping = .75)
+pg$vector
+```
+
+
+```{r}
+#page rank vector at damping constant 0.25
+pg <- page.rank(g, damping = .95)
+pg$vector
+```
+#### observations:
+#### In general The PageRank algorithm is an algorithm used by search engines to rank web pages based on their importance and relevance
+#### PageRank works by assigning a numerical value, called a PageRank score, to each web page in a search engine's index. The score represents the importance of the page in the overall link structure of the web. The underlying idea behind PageRank is that a web page is considered more important if it receives many links from other important pages.
+#### As we change the damping factors there are different pages that are highly ranked each time. for example at damping factor 0.05 Webpage 'C' is highly ranked. similarly at damping factor 0.25 also C is highly ranked.
+#### At damping factor 0.5 'A'. at damping factor 0.75 D is highly ranked webpage and damping factor 0.95 'D' is highly ranked webpage.
+#### I think as we are keep on increasing the damping factor in the PageRank algorithm it is reinforcing the importance of link structure and making the algorithm more focused on the interconnectedness of web pages and it is improving the convergence and reducing the impact of random jumps, and enhancing the differentiation of PageRank scores among pages based on their link-based authority. So, yes the relative ranking of importance according to PageRank generally aligns with our intuition
+
+#### (b) Compute the PageRank vector of Webgraph A for damping constants p = 0.05, 0.25, 0.50, 0.75, and 0.95. How sensitive is the PageRank vector, and overall ranking of importance, to the damping constant? Does the relative ranking of importance according to PageRank support your intuition?
+
+#### Answer:
+
+```{r}
+nodes <- data.frame(names = c("A", "B", "C", "D" , "E" , "F" , "G" , "H"))
+```
+
+
+```{r}
+relations <- data.frame(
+from = c("B", "C", "D", "E", "F", "G", "H"),
+to = c("A", "A", "B", "B", "C", "C", "C"))
+g <- graph.data.frame(relations, directed = TRUE, vertices = nodes)
+plot(g)
+
+```
+
+
+```{r}
+pg <- page.rank(g, damping = .25)
+pg$vector
+```
+
+#### Observations:
+
+#### As the damping factor is set to 0.25, it means there is a 25% chance of randomly jumping to any page on the web instead of following a link. This introduces a degree of randomness and models user behavior in navigating the web.
+
+####  The relationship between the number of incoming links and relative importance, the PageRank algorithm tends to assign higher scores to pages that receive more incoming links from important and well-connected pages. This reflects the notion that pages with many incoming links are considered more reputable or authoritative.
+
+#### And also our pagerank algorithm not only considers just the incoming links it also considers the quality of the links (from what webpages the links are coming from). for example if just consider consider no.of incoming links webpage C should have high rank score but in our output we have A with high rank score.
+
+#### So, In my opinion, The relative importance ranking determined by PageRank,generally confirms our intuition. However, it's important to take into account other variables that affect PageRank scores, such as link quality, relevance, and the unique properties of the web network under analysis.
+
+\newpage
+### Question 6: Data released from the US department of Commerce, Bureau of the Census is available in R
+### data(state)
+### ?state 
+
+#### (a) Focus on the data {Population, Income, Illiteracy, Life Exp, Murder, HS Grad, Frost, Area}. Cluster this data using SOM. Keep the class labels (region, or state name) in mind, but do not use them in the modeling. Report your detailed findings. ** You may have done this step in an earlier assignment.
+
+```{r}
+data(state)
+#scale the state.x77 data.
+state.x77.scaled <- scale(state.x77)
+dim(state.x77.scaled)
+```
+
+```{r}
+# fit an SOM
+set.seed(123)
+state.x77.grid <- somgrid(xdim = 6, ydim = 6, topo = "hexagonal")
+state.x77.som <- som(state.x77.scaled, grid = state.x77.grid, rlen = 3000)
+
+#state.x77 codes
+codes_x <- state.x77.som$codes[[1]]
+```
+
+```{r}
+plot(state.x77.som, main = "state.x77 Data")
+```
+```{r}
+plot(state.x77.som, type = "count")
+```
+
+```{r}
+#do hierarchical clustering 
+d1 <- dist(codes_x)
+hc1 <- hclust(d1, method = "complete")
+plot(hc1)
+```
+```{r}
+ct5 <- cutree(hc1, k = 5)
+si5 <- silhouette(ct5, dist = d1)
+plot(si5)
+```
+
+
+#### show the som clustering here..
+
+
+```{r}
+#Plot SOM Cluster
+graphics.off()
+som_cluster1 <- cutree(hc1, h = 5)
+# plot the SOM with the found clusters
+my_pal <- c("red", "blue","orange","green","yellow")
+my_bhcol <- my_pal[som_cluster1]
+
+plot(state.x77.som, type = "mapping", col = "black", bgcol = my_bhcol)
+add.cluster.boundaries(state.x77.som, som_cluster1)
+```
+
+#### Observations:
+#### From the silhouette plots we could observe that K = 5 has better clustering Because it has uniform distribution of datapoints between the clusters and has uniform pattern of clusters and also has less negative values
+#### I think SOM also did a good job in clustering and if we see the optimal clusters given by SOM is 4 and the one cluster is just because of an outlier which is accurately reported in silhoutte, SOM and hirerachical clustering.
+#### The number of datapoints in each cluster in SOM are pretty uniform. And also as SOM is converting the high dimensional data low dimensional data it is faster here.
+
+
+#### (b) Build a Gaussian Graphical Model using the Graphical Lasso for the 8 predictors mentioned in Part A. What do you find for different penalties, and how does it compliment (and/or contradict) your results in part A
+
+#### Answer:
+
+```{r}
+ state.x77cov <- cov.wt(state.x77.scaled, method = "ML")
+```
+
+```{r}
+ S <- state.x77cov$cov
+m0.lasso <- glasso(S, rho = 0.6) ## Regularization parameter
+my.edges <- m0.lasso$wi != 0
+diag(my.edges) <- 0
+g.lasso <- as(my.edges, "graphNEL")
+nodes(g.lasso) <- colnames(state.x77.scaled)
+
+```
+
+
+
+```{r}
+
+# Estimate the precision matrix using graphical lasso
+ggm_model <- huge(state.x77.scaled, method = "glasso", lambda = 1)
+
+# Access the estimated precision matrix
+precision_matrix <- ggm_model$omega
+
+```
+
+
+
+#### observations:
+
+#### By performing both clustering using SOM and building a Gaussian Graphical Model, I gained insights into the relationships between the variables and identified patterns in the data. 
+
+#### Alabama:
+
+####  Population: 3615
+####  Income: 3624
+####  Illiteracy: 2.1
+#### Life Exp: 69.05
+#### Murder: 15.1
+#### HS Grad: 41.3
+####  Frost: 20
+#### Area: 50708
+####  California:
+
+#### Population: 21198
+#### Income: 5114
+#### Illiteracy: 1.1
+#### Life Exp: 71.71
+#### Murder: 10.3
+#### HS Grad: 62.6
+#### Frost: 20
+#### Area: 156361
+
+#### New York:
+#### Population: 18076
+#### Income: 2448
+#### Illiteracy: 0.7
+#### Life Exp: 70.55
+#### Murder: 10.9
+#### HS Grad: 52.7
+#### Frost: 166
+#### Area: 47831
+
+#### These observations represent three different states and their corresponding values for the given dataset variable. By analyzing the relationships between these variables and comparing them across different states, By using two different clustering we got insights into the socio-economic characteristics of each state and identified any patterns or trends present in the dataset.
+
+
+
+

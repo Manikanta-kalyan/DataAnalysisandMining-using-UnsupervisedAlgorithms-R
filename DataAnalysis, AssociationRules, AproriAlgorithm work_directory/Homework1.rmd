@@ -1,0 +1,408 @@
+---
+title: "Homework 1"
+author: "Rachael Hageman Blair"
+date: "`r Sys.Date()`"
+output:
+  pdf_document:
+    latex_engine: xelatex
+  word_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Loading Packages:
+```{r}
+library(ISLR2)
+library(arules)
+library(moments)
+library(ggplot2)
+library(reshape2)
+library(rpart)
+library(caret)
+library (rpart.plot)
+```
+
+
+\newpage
+### Question 1:
+####Consider the “College” data in the ISLR2 package:
+####> library(ISLR2)
+####> data(College)
+####> head(College)
+
+####a) Present some visualizations of this data such as pair plots and histograms? Do you think any scaling or transformation is required?
+
+plotting a pair plot
+
+```{r}
+pairs(College, las=2, main= "College")
+```
+
+Plotting Histograms
+
+```{r}
+par(mfrow=c(2,2))
+hist(College[,2], breaks = 25, main = "No.of Applications received Histogram", xlab = "Apps")
+hist(College[,3], breaks = 25, main = "No.of Applications accepted Histogram", xlab = "Accept")
+hist(College[,4], breaks = 25, main = "No.of New Students enrolled Histogram", xlab = "Enroll")
+hist(College[,9], breaks = 25, main = "Out-of-state tuition Histogram", xlab = "Outstate")
+```
+Check whether scaling required or not
+
+```{r}
+sapply(College[, -1], skewness)
+```
+As shown above some of the variables have right-skewness greater than 0.5, so they need to be scaled using log transformation. So, that the distribution will be more symmetrical and it is easy to identify patterns and also will reduce the effect of outliers.
+
+####b) Scale the data appropriately (e.g., log transform) and present the visualizations in part A. Have any new relationships been revealed.
+
+Applying log transformation to the data
+
+```{r}
+# Applying log transformation to the data
+College <- College
+College[, c(2:3,7:12,17)] <- log(College[,c(2:3,7:12,17)])
+head(College)
+```
+
+plotting a pair to the transformed data
+
+```{r}
+pairs(College, las=2, main= "College")
+```
+
+plotting Histograms to the transformed data.
+```{r}
+par(mfrow=c(2,2))
+hist(College[,2], breaks = 25, main = "No.of Applications received Histogram", xlab = "Apps")
+hist(College[,3], breaks = 25, main = "No.of Applications accepted Histogram", xlab = "Accept")
+hist(College[,4], breaks = 25, main = "Estimated book costs", xlab = "Books")
+hist(College[,9], breaks = 25, main = "Out-of-state tuition Histogram", xlab = "Outstate")
+```
+
+
+
+
+Plotting a co-relation matrix
+```{r}
+
+corr_matrix <- cor(College[,-1])
+melted_corr_matrix <- melt(corr_matrix)
+ggplot(data = melted_corr_matrix, aes(x = Var1, y = Var2, fill = value)) +
+  geom_tile() +
+  scale_fill_gradient2(low = "blue", mid = "white", high = "red", 
+                       midpoint = 0, limit = c(-1,1), space = "Lab",
+                       name="Pearson\nCorrelation") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, vjust = 1, 
+                                   size = 12, hjust = 1)) +
+  coord_fixed()
+
+```
+
+After applying the log transformation, we can see that the variables are more normally distributed. 
+
+Additionally, in the scatter plot matrix, the relationship between "Out-state" and "Private" is less clear. 
+
+Number of new students Enrolled and Number of applications accepted are linearly related with Number of applications Received. 
+
+Number of full-time Undergraduate students has linear relationship with Number of applications Received, accepted and new students enrolled.
+
+Student-Faculty Ratio and Out-of-state tution are non linearly related. Instructional expenditure per student and out-of-state tution are linearly related
+
+#### c) Subset the data into two data frames: “private” and “public”. Sort them alphabetically. Save them as tab delimited txt files. Be sure these are the only two objects saved in that file. Submit it with your assignment (only on ublearns).
+
+Forming the data frames public and private
+```{r}
+private <- College[College$Private == "Yes",]
+public <- College[College$Private == "No",]
+```
+
+Sorting the data frames alphabetically by using the row names.
+
+```{r}
+private <- private[order(rownames(private)), ]
+public <- public[order(rownames(public)), ]
+```
+
+
+```{r}
+head(private)
+```
+```{r}
+head(public)
+```
+Save the public and private data frames as tab delimited *txt files
+
+```{r}
+write.table(public, "public_colleges.txt", sep = "\t", row.names = TRUE,col.names = colnames(College))
+write.table(private, "private_colleges.txt", sep = "\t", row.names = TRUE,col.names = colnames(College))
+```
+
+#### d) Within each new data frame from part C, eliminate Universities that have less than the median number of HS students admitted from the top 25% of the class(“Top25perc”).
+
+```{r}
+#No.of Top 25%  scored High shool students that joined in each public university 
+public$Top25HS <- public$Enroll * (public$Top25perc / 100)
+#Print median of Top 25 High school students
+median(public$Top25HS)
+# Within each data frame, eliminate public universities with less than median Top25perc High school students.
+public <- public[public$Top25HS >= median(public$Top25HS),]
+```
+
+
+```{r}
+#No.of Top 25%  scored Highshool students that joined in each public university 
+private$Top25HS <- private$Enroll * (private$Top25perc / 100)
+#print median of Top 25 High school students
+median(private$Top25HS)
+# Within each data frame, eliminate public universities with less than median Top25perc High school students.
+private <- private[private$Top25HS >= median(private$Top25HS),]
+```
+```{r}
+head(public)
+```
+
+```{r}
+head(private)
+```
+#### e) Create a new variable that categorizes graduation rate into “High”, “Medium” and “Low”, use a histogram or quantiles to determine how to create this variable. Append this variable to your “private” and “public” datasets.
+```{r}
+# Determine cut-off points using quantile
+private.quantiles <- quantile(private$Grad.Rate, probs = c(0, 0.5, 0.75, 1))
+public.quantiles <- quantile(public$Grad.Rate, probs = c(0, 0.5, 0.75, 1))
+private.quantiles
+public.quantiles
+```
+
+```{r}
+# Create new variable using cut
+private$Grad_Rate_Category <- cut(private$Grad.Rate, breaks = private.quantiles,
+                              labels = c("Low", "Medium", "High"), include.lowest = TRUE)
+public$Grad_Rate_Category <- cut(public$Grad.Rate, breaks = public.quantiles,
+                             labels = c("Low", "Medium", "High"), include.lowest = TRUE)
+```
+
+
+```{r}
+head(private)
+```
+
+```{r}
+head(public)
+```
+
+#### Create a “list structure” that contains your two datasets and save this to an .RData file. Make sure that your file contains only the list structure. Submit this with your homework (only on ublearns).
+
+Creating a list structure and copying public and private data frames to list
+```{r}
+private_public_data <- list()
+private_public_data[[1]] <- public
+private_public_data[[2]] <- private
+```
+
+```{r}
+save(private_public_data,file='private_public_data.RData')
+```
+
+\newpage
+### Question 2:
+#### 2)	You are going to derive generalized association rules to the marketing data from your book ESL. This data is in the available on UB learns.  Specifically, generate a reference sample of the same size of the training set. This can be done in a couple of ways, e.g., (i) sample uniformly for each variable, or (ii) by randomly permuting the values within each variable independently. Build a classification tree to the training sample (class 1) and the reference sample (class 0) and describe the terminal nodes having highest estimated class 1 probability. Compare the results to the results near Table 14.1 (ESL), which were derived using PRIM.
+
+
+Imported Marketing Data through CSV into R
+
+```{r}
+Marketing <- read.csv("Marketing.csv")
+head(Marketing)
+```
+Removing NA values
+
+```{r}
+Marketing <- na.omit(Marketing)
+```
+
+
+Creating the reference sample by permuting or sampling the values within each variable independently.
+```{r}
+set.seed(123)
+ref_sample = Marketing
+for(i in 1:ncol(ref_sample)){
+  ref_sample[,i] = sample(ref_sample[,i], nrow(ref_sample), replace = T)
+}
+dim(ref_sample)
+```
+
+
+Assigning class variables to the sample observations both train and reference (binary)
+
+```{r}
+ref_sample$class <- 0
+Marketing$class <- 1
+```
+
+Combine the two samples and store in data_all variable
+
+```{r}
+data_all <- rbind(Marketing, ref_sample)
+```
+
+Fit the Tree model
+
+```{r}
+tree <- rpart(class ~ ., data = data_all, method = "class")
+```
+
+Plot the tree
+```{r}
+rpart.plot(tree)
+#summary(tree)
+```
+From the above plot it is evident that the highest estimated class 1 probability is 0.84.
+
+Obersavations from the tree comparing to ESL PRIM data.
+
+If Number of Household <= 8 and Number of children <=5 and Language_in_home>=2 => Ethnic classification>=7 with a value of 0.7 and confidence 5%
+
+If Dual_income < 2, Marital_status >= 5, Household status < 3, Ethnic classification < 3,Age < 3 => languages in home <3 with a value of 0.73   and confidence 7%
+
+If Number_of_Children<=5,Language_In_Home <=2, Income>=2, Marital status>=5 => Education <3 with a value of 0.70 and confidence 8%
+
+
+\newpage
+### Question 3:
+#### Consider the Boston Housing Data in the ISLR2 package. (Important – do not use data from any other packages).
+
+#### a) Visualize the data using histograms of the different variables in the data set. Transform the data into a binary incidence matrix, and justify the choices you make in grouping categories.
+
+Visualizing the data using histograms.
+```{r}
+par(mfrow=c(3,2))
+#x11()
+hist(Boston$crim, breaks = 4, main = "per capita crime rate by town.", xlab = "crim")
+
+#x11()
+hist(Boston$zn, breaks = 3, main = "proportion of residential land zoned for lots over 25,000 sq.ft.", xlab = "zn")
+
+#x11()
+hist(Boston$indus, breaks = 3, main = "proportion of non-retail business acres per town.", xlab = "indus")
+
+#x11()
+hist(Boston$age, breaks = 3, main = "proportion of owner-occupied units built prior to 1940.", xlab = "age")
+
+#x11()
+hist(Boston$tax, breaks = 3, main = "full-value property-tax rate per $10,000.", xlab = "tax")
+```
+#Copy Boston data to Boston2 for later use.
+```{r}
+Boston2<-Boston
+
+```
+
+Categorize the variables using cut function
+```{r}
+
+
+Boston$crim <- ordered(cut(Boston$crim, breaks = c(-Inf, 1, 5, Inf), labels = c("Low", "Medium", "High")))
+Boston$zn <- cut(Boston$zn, breaks = c(-Inf, 10, 20, Inf), labels = c("Low", "Medium", "High"))
+Boston$indus <- cut(Boston$indus, breaks = c(-Inf, 15, 25, Inf), labels = c("Low", "Medium", "High"))
+Boston$chas <- factor(Boston$chas)
+Boston$nox <- cut(Boston$nox, breaks = c(-Inf, 0.5, 0.7, Inf), labels = c("Low", "Medium", "High"))
+Boston$rm <- cut(Boston$rm, breaks = c(-Inf, 6, 7, Inf), labels = c("Low", "Medium", "High"))
+Boston$age <- ordered(cut(Boston$age, breaks = c(-Inf, 70, 85, Inf), labels = c("Low", "Medium", "High")))
+Boston$dis <- cut(Boston$dis, breaks = c(-Inf, 3, 5, Inf), labels = c("short", "Medium", "Long"))
+Boston$rad <- factor(Boston$rad)
+Boston$tax <- cut(Boston$tax, breaks = c(-Inf, 300, 500, Inf), labels = c("Low", "Medium", "High"))
+Boston$ptratio <- cut(Boston$ptratio, breaks = c(-Inf, 17, 20, Inf), labels = c("Low", "Medium", "High"))
+Boston$lstat <- cut(Boston$lstat, breaks = c(-Inf, 10, 15, Inf), labels = c("Low", "Medium", "High"))
+Boston$medv <- cut(Boston$medv, breaks = c(-Inf, 25, Inf), labels = c("low", "high"))
+```
+
+I have used different break points for each variable, based on the distribution in histograms.
+
+I have also looked at the data and used relevant domain knowledge to categorize each variable, so some variables like tax, dis, age.
+
+As the CRIM and AGE  are ordered variables general cut function doesn't preserve the ordering. So, I have used order function to preserve the order of variables.
+
+For the un ordered categorical variables like CHAS and RAD we leave them as un ordered factors only as they are already categorized. 
+
+
+Convert to a binary incidence matrix
+
+```{r}
+Boston <- as(Boston, "transactions")
+summary(Boston)
+
+```
+
+#### b) Visualize the data using the itemFrequencyPlot in the “arules” package. Apply the apriori algorithm (Do not forget to specify parameters in your write up).
+
+Plot the item Frequency plot
+
+```{r}
+#x11()
+itemFrequencyPlot(Boston, support = 0.01, cex.names = 0.8)
+```
+Apply the Apriori algorithm
+
+```{r}
+rules  <- apriori(Boston, parameter = list(support = 0.01, confidence = 0.7))
+summary(rules)
+```
+I have considered minimum support value of 0.01, so we get the most of the association rules(1-5%) without missing many. 
+
+And confidence which can be from 50% to 80% in general. so I choose 0.7 to get good rules.
+
+#### c) A student is interested low taxes, but wants to be in a safe aera with low crime. What can you advise on this matter through the mining of association rules?
+
+```{r}
+rulestax_and_crime_low <- subset(rules, subset = lhs %in% c("crim=Low") & rhs %in% c("tax=Low") & lift > 1.2)
+inspect(head(sort(rulestax_and_crime_low , by = "confidence"), n = 6))
+inspect(head(sort(rulestax_and_crime_low , by = "lift"), n = 6))
+
+```
+
+If we need crime rate low area which also has low tax
+
+Rule 1: {crim=Low, indus=High, rad=2}=>{tax=Low}, From rule 1 we can say that he need to choose a industrial area and  also an area far from radial highways
+
+Rule 2: {crim=Low, indus=High, ptratio=Medium} =>{tax=Low}, From rule 2 we say that he need to choose industrial area and also an area with less pupil-teacher ratio.(generally we have more taxes in the area of less pupil-teacher ratio)
+
+Rule 3: {crim=Low, dis=Medium, rad=2}=>{tax=Low}, From rule 3 we can say that he little bit near to Boston employment centers.
+
+Finally from the rules we can say that if we want to choose a area with low crime and tax he need to choose an industrial area instead of residential area and also an area with less accessibility to radial highways and area with schools having medium pupil-teacher ratio.
+
+
+#### d) A family is moving to the area, and has made schooling a priority. They want schools with low pupil-teacher ratios. What can you advise on this matter through the mining of association rules?
+
+```{r}
+low_pupil_teacher_ratio <- subset(rules, subset = rhs %in% "ptratio=Low" & lift>1.2)
+inspect(head(sort(low_pupil_teacher_ratio , by = "confidence"), n = 6))
+inspect(head(sort(low_pupil_teacher_ratio , by = "lift"), n = 6))
+```
+
+If we need low pupil-teacher ratios.
+
+Rule1:{zn=High, rad=6}=> {ptratio=Low} They need to choose an area with good proportion of residential land area (>25000 sq.ft).
+
+Rule2:{dis=Long, rad=6}=> {ptratio=Low} They need to choose an area which is far from the five Boston employment centers.
+
+Rule3:{nox=Low, rad=6}=>{ptratio=Low} They need to choose an area with low nitrogen oxides concentration.
+
+Rule4:{rad=6, lstat=Low}=> {ptratio=Low} They need to choose area which has less percent lower status population.
+
+Finally if they need low pupil-teacher ratio they need to choose an area with good proportion of residential land area, far from five Boston employment centers, low nitrogen oxides concentration and less percent of lower status population.
+
+Extra credit
+
+```{r}
+model.control <- rpart.control(minsplit = 5, xval = 10, cp = 0)
+pttree<- rpart(ptratio~., data = Boston2, method = "class", control = model.control)
+```
+
+```{r}
+#x11()
+rpart.plot(pttree)
+```
